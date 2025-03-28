@@ -13,7 +13,7 @@ def home():
     hostname    = socket.gethostname()
     pod_ip      = socket.gethostbyname(hostname)
 
-    image_version = "2.0.0"
+    image_version = "1.0.0"
     # Use the current redis_instance from redis_client module
     redis_info = redis_client.redis_instance.info()
     redis_clients = redis_info.get("connected_clients", "N/A")
