@@ -1,28 +1,24 @@
-import os
 import socket
-from flask import Flask
-import redis
+from flask import Blueprint, request
+from app import redis_client  # Import the module instead of the variable directly
+from app.utils import get_env_variable
 
-app = Flask(__name__)
+main_blueprint = Blueprint("main", __name__)
 
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_port = int(os.getenv("REDIS_PORT", 6379))
-r = redis.Redis(host=redis_host, port=redis_port, db=0)
-
-@app.route("/")
+@main_blueprint.route("/")
 def home():
-
-    app_name    = os.getenv("APP_NAME")
-    environment = os.getenv("STAGE_ENVIRONMENT")
+    # Get application name and environment
+    app_name    = get_env_variable("APP_NAME", "Flask CI Demo")
+    environment = get_env_variable("STAGE_ENVIRONMENT", "development")
     hostname    = socket.gethostname()
     pod_ip      = socket.gethostbyname(hostname)
-    
-    image_version = "1.0.0"
-    
-    redis_info = r.info()
+
+    image_version = "2.0.0"
+    # Use the current redis_instance from redis_client module
+    redis_info = redis_client.redis_instance.info()
     redis_clients = redis_info.get("connected_clients", "N/A")
     redis_uptime = redis_info.get("uptime_in_seconds", "N/A")
-    connection_count = r.incr("connection_count")
+    connection_count = redis_client.redis_instance.incr("connection_count")
 
     return f"""
     <html>
@@ -68,6 +64,3 @@ def home():
     </body>
     </html>
     """
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=80)
