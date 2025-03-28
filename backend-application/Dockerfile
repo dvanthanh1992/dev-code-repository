@@ -1,5 +1,7 @@
-FROM python:3.9-alpine
+FROM python:3.11-slim
 WORKDIR /app
-COPY main.py /app
-RUN pip install --no-cache-dir flask redis
-CMD ["python", "main.py"]
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+ENV FLASK_APP=app.py
+CMD ["python", "app.py"]
