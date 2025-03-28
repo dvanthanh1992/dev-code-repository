@@ -17,7 +17,7 @@ def home():
     hostname    = socket.gethostname()
     pod_ip      = socket.gethostbyname(hostname)
     
-    image_version = "4.0.0"
+    image_version = "1.0.0"
     
     redis_info = r.info()
     redis_clients = redis_info.get("connected_clients", "N/A")
