@@ -1,6 +1,7 @@
 import os
 import socket
-from flask import Flask
+import json
+from flask import Flask, request, jsonify
 import redis
 
 app = Flask(__name__)
@@ -17,7 +18,7 @@ def home():
     hostname    = socket.gethostname()
     pod_ip      = socket.gethostbyname(hostname)
     
-    image_version = "1.0.0"
+    image_version = "1.1.0"
     
     redis_info = r.info()
     redis_clients = redis_info.get("connected_clients", "N/A")
@@ -52,6 +53,12 @@ def home():
                 color: #555;
                 margin-top: 10px;
             }}
+            .api-info {{
+                background-color: #f5f5f5;
+                padding: 15px;
+                margin-top: 20px;
+                border-left: 4px solid #4CAF50;
+            }}
         </style>
     </head>
     <body>
@@ -65,9 +72,69 @@ def home():
             <p class="connection-info"><b>Connected Clients:</b> {redis_clients}</p>
             <p class="connection-info"><b>Server Uptime (sec):</b> {redis_uptime}</p>
         </div>
+        <div class="api-info">
+            <h3>API Endpoints</h3>
+            <p><b>GET /api/status</b> - System status information</p>
+            <p><b>POST /api/messages</b> - Send a new message</p>
+            <p><b>GET /api/messages</b> - Get all messages</p>
+        </div>
     </body>
     </html>
     """
+
+@app.route("/api/status")
+def status():
+    app_name = os.getenv("APP_NAME")
+    environment = os.getenv("STAGE_ENVIRONMENT")
+    hostname = socket.gethostname()
+    
+    status_info = {
+        "application": app_name,
+        "environment": environment,
+        "status": "operational",
+        "hostname": hostname,
+        "version": "1.1.0"
+    }
+    
+    return jsonify(status_info)
+    
+@app.route("/api/messages", methods=["GET", "POST"])
+def messages():
+    if request.method == "POST":
+        try:
+            data = request.json
+            if not data or not data.get("message"):
+                return jsonify({"status": "error", "error": "Missing message content"}), 400
+                
+            message_id = r.incr("message_id_counter")
+            message_data = {
+                "id": message_id,
+                "message": data.get("message"),
+                "timestamp": r.time()[0]
+            }
+            
+            r.hset(f"message:{message_id}", mapping=message_data)
+            r.lpush("messages", message_id)
+            
+            return jsonify({"status": "success", "message_id": message_id}), 201
+            
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)}), 500
+    else:
+        try:
+            message_ids = r.lrange("messages", 0, -1)
+            messages = []
+            
+            for message_id in message_ids:
+                message_data = r.hgetall(f"message:{message_id.decode()}")
+                if message_data:
+                    # Convert bytes to string
+                    messages.append({k.decode(): v.decode() for k, v in message_data.items()})
+            
+            return jsonify(messages)
+            
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)
