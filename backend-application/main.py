@@ -12,7 +12,6 @@ r = redis.Redis(host=redis_host, port=redis_port, db=0)
 
 @app.route("/")
 def home():
-
     app_name    = os.getenv("APP_NAME")
     environment = os.getenv("STAGE_ENVIRONMENT")
     hostname    = socket.gethostname()
@@ -128,7 +127,6 @@ def messages():
             for message_id in message_ids:
                 message_data = r.hgetall(f"message:{message_id.decode()}")
                 if message_data:
-                    # Convert bytes to string
                     messages.append({k.decode(): v.decode() for k, v in message_data.items()})
             
             return jsonify(messages)
