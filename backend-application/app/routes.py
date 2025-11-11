@@ -28,7 +28,7 @@ def home():
     pod_ip = socket.gethostbyname(hostname)
     
 
-    image_version = "4.0.0"
+    image_version = "5.0.0"
     
     version_info = VERSION_COLOR_MAP.get(image_version, {"color": "blue", "hex": "#4169E1"})
     color = version_info["color"]
