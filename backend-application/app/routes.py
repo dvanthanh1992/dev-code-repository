@@ -28,7 +28,7 @@ def home():
     pod_ip = socket.gethostbyname(hostname)
     
 
-    image_version = "3.0.0"
+    image_version = "4.0.0"
     
     version_info = VERSION_COLOR_MAP.get(image_version, {"color": "blue", "hex": "#4169E1"})
     color = version_info["color"]
@@ -52,7 +52,7 @@ def home():
         <style>
             body {{
                 font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, {bg_color} 0%, #1a1a2e 100%);
+                background: #add8e6;
                 padding: 20px;
                 margin: 0;
                 min-height: 100vh;
