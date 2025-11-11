@@ -12,7 +12,7 @@ def home():
     hostname = socket.gethostname()
     pod_ip = socket.gethostbyname(hostname)
     
-    image_version = "2.0.0"
+    image_version = "1.0.0"
 
     return f"""
     <html>
