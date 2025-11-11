@@ -6,6 +6,20 @@ import random
 
 main_blueprint = Blueprint("main", __name__)
 
+# Version to color mapping (10 versions)
+VERSION_COLOR_MAP = {
+    "1.0.0": {"color": "blue", "hex": "#4169E1"},
+    "2.0.0": {"color": "green", "hex": "#32CD32"},
+    "3.0.0": {"color": "yellow", "hex": "#FFD700"},
+    "4.0.0": {"color": "red", "hex": "#DC143C"},
+    "5.0.0": {"color": "purple", "hex": "#9370DB"},
+    "6.0.0": {"color": "orange", "hex": "#FF8C00"},
+    "7.0.0": {"color": "cyan", "hex": "#00CED1"},
+    "8.0.0": {"color": "pink", "hex": "#FF69B4"},
+    "9.0.0": {"color": "lime", "hex": "#7FFF00"},
+    "10.0.0": {"color": "magenta", "hex": "#FF00FF"}
+}
+
 @main_blueprint.route("/")
 def home():
     app_name = get_env_variable("APP_NAME", "Flask CI Demo")
@@ -13,25 +27,23 @@ def home():
     hostname = socket.gethostname()
     pod_ip = socket.gethostbyname(hostname)
     
-    # Version/color variants for rollout simulation
-    version = get_env_variable("APP_VERSION", "v1")
-    color = get_env_variable("APP_COLOR", "blue")
-    
+
     image_version = "1.0.0"
+    
+    version_info = VERSION_COLOR_MAP.get(image_version, {"color": "blue", "hex": "#4169E1"})
+    color = version_info["color"]
+    bg_color = version_info["hex"]
+    
     redis_info = redis_client.redis_instance.info()
     redis_clients = redis_info.get("connected_clients", "N/A")
     redis_uptime = redis_info.get("uptime_in_seconds", "N/A")
     connection_count = redis_client.redis_instance.incr("connection_count")
     
-    # Color mapping
-    color_map = {
-        "blue": "#4169E1",
-        "green": "#32CD32",
-        "yellow": "#FFD700",
-        "red": "#DC143C",
-        "purple": "#9370DB"
-    }
-    bg_color = color_map.get(color, "#4169E1")
+    # Generate 10 balls with random delays for canary effect
+    balls_html = ""
+    for i in range(10):
+        delay = i * 0.3
+        balls_html += f'<div class="ball" style="top: {20 + i * 16}px; animation-delay: {delay}s;"></div>'
     
     return f"""
     <html>
@@ -47,7 +59,7 @@ def home():
                 color: white;
             }}
             .container {{
-                max-width: 800px;
+                max-width: 1000px;
                 margin: 0 auto;
             }}
             h1 {{
@@ -73,17 +85,16 @@ def home():
             }}
             .ball {{
                 position: absolute;
-                width: 80px;
-                height: 80px;
+                width: 50px;
+                height: 50px;
                 background: radial-gradient(circle at 30% 30%, #ffffff, {bg_color});
                 border-radius: 50%;
-                animation: roll 3s linear infinite;
-                box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-                top: 60px;
+                animation: roll 4s linear infinite;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.4);
             }}
             @keyframes roll {{
-                0% {{ left: -100px; transform: rotate(0deg); }}
-                100% {{ left: 100%; transform: rotate(360deg); }}
+                0% {{ left: -60px; transform: rotate(0deg); }}
+                100% {{ left: 100%; transform: rotate(720deg); }}
             }}
             .metric {{
                 display: inline-block;
@@ -105,6 +116,19 @@ def home():
                 margin: 10px;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             }}
+            .version-legend {{
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 10px;
+                margin: 20px 0;
+            }}
+            .version-item {{
+                padding: 8px;
+                border-radius: 8px;
+                text-align: center;
+                font-size: 12px;
+                font-weight: bold;
+            }}
         </style>
     </head>
     <body>
@@ -112,12 +136,12 @@ def home():
             <h1>🚀 {app_name}</h1>
             
             <div style="text-align: center;">
-                <span class="version-badge">{version}</span>
+                <span class="version-badge">{image_version}</span>
                 <span class="version-badge">{color.upper()}</span>
             </div>
             
             <div class="ball-container">
-                <div class="ball"></div>
+                {balls_html}
             </div>
             
             <div class="info-box">
@@ -155,10 +179,17 @@ def home():
                     <div class="metric-value">{redis_uptime}</div>
                 </div>
             </div>
+            
+            <div class="info-box">
+                <h2 style="margin-top: 0;">🎨 Version Color Map</h2>
+                <div class="version-legend">
+                    {"".join([f'<div class="version-item" style="background: {v["hex"]};">{k}<br>{v["color"]}</div>' 
+                             for k, v in VERSION_COLOR_MAP.items()])}
+                </div>
+            </div>
         </div>
         
         <script>
-            // Auto-refresh every 5 seconds to see rollout changes
             setTimeout(() => location.reload(), 5000);
         </script>
     </body>
