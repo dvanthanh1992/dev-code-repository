@@ -1,0 +1,188 @@
+{{- $strategy := include "msp-demo.strategy" . -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "msp-demo.fullname" . }}
+  labels:
+    {{- include "msp-demo.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: {{ .Values.rollout.revisionHistoryLimit }}
+  progressDeadlineSeconds: {{ .Values.rollout.progressDeadlineSeconds }}
+  progressDeadlineAbort: {{ .Values.rollout.progressDeadlineAbort }}
+  minReadySeconds: {{ .Values.rollout.minReadySeconds }}
+  selector:
+    matchLabels:
+      {{- include "msp-demo.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  strategy:
+    {{- if eq $strategy "canary" }}
+    canary:
+      maxSurge: {{ .Values.canary.maxSurge }}
+      maxUnavailable: {{ .Values.canary.maxUnavailable }}
+      stableMetadata:
+        labels:
+          demo.argoproj.io/role: stable
+      canaryMetadata:
+        labels:
+          demo.argoproj.io/role: canary
+      steps:
+        {{- toYaml .Values.canary.steps | nindent 8 }}
+    {{- else }}
+    blueGreen:
+      activeService: {{ include "msp-demo.fullname" . }}
+      previewService: {{ include "msp-demo.previewServiceName" . }}
+      autoPromotionEnabled: {{ .Values.blueGreen.autoPromotionEnabled }}
+      autoPromotionSeconds: {{ .Values.blueGreen.autoPromotionSeconds }}
+      scaleDownDelaySeconds: {{ .Values.blueGreen.scaleDownDelaySeconds }}
+      previewReplicaCount: {{ .Values.blueGreen.previewReplicaCount }}
+      activeMetadata:
+        labels:
+          demo.argoproj.io/role: active
+      previewMetadata:
+        labels:
+          demo.argoproj.io/role: preview
+    {{- end }}
+  template:
+    metadata:
+      annotations:
+        checksum/app-version: {{ printf "%s:%s:%s:%s" .Values.app.version .Values.app.color .Values.image.tag $strategy | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "msp-demo.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+        app.kubernetes.io/version: {{ .Values.app.version | quote }}
+        demo.argoproj.io/color: {{ .Values.app.color | quote }}
+        demo.argoproj.io/role: rollout
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "msp-demo.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.podDiscovery.enabled }}
+      terminationGracePeriodSeconds: {{ .Values.rollout.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: APP_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app.kubernetes.io/version']
+            - name: APP_COLOR
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['demo.argoproj.io/color']
+            - name: APP_TRACK
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['demo.argoproj.io/role']
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: APP_COMMIT
+              value: {{ .Values.app.commit | quote }}
+            - name: APP_MESSAGE
+              value: {{ default "Hello from Argo Rollouts" .Values.app.message | quote }}
+            - name: APP_ENVIRONMENT
+              value: {{ .Values.app.environment | quote }}
+            - name: ROLLOUT_MODE
+              value: {{ $strategy | quote }}
+            - name: PREVIEW_URL
+              value: {{ include "msp-demo.previewUrl" . | quote }}
+            - name: TRAFFIC_RPS
+              value: {{ .Values.traffic.rps | quote }}
+            - name: PREVIEW_RPS
+              value: {{ .Values.traffic.previewRps | quote }}
+            - name: FAILURE_RATE
+              value: {{ .Values.app.failureRate | quote }}
+            - name: MIN_LATENCY_MS
+              value: {{ .Values.app.minLatencyMs | quote }}
+            - name: MAX_LATENCY_MS
+              value: {{ .Values.app.maxLatencyMs | quote }}
+            - name: KUBERNETES_DISCOVERY_ENABLED
+              value: {{ .Values.podDiscovery.enabled | quote }}
+            - name: TOPOLOGY_CACHE_SECONDS
+              value: {{ .Values.podDiscovery.topologyCacheSeconds | quote }}
+            - name: POD_LABEL_SELECTOR
+              value: "app.kubernetes.io/name={{ include "msp-demo.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=app"
+            - name: ROLLOUT_NAME
+              value: {{ include "msp-demo.fullname" . | quote }}
+            - name: REDIS_HOST
+              value: {{ include "msp-demo.redisHost" . | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.redis.port | quote }}
+            - name: REDIS_DB
+              value: {{ .Values.redis.db | quote }}
+            - name: REDIS_SSL
+              value: {{ .Values.redis.ssl | quote }}
+            - name: REDIS_KEY_PREFIX
+              value: {{ .Values.redis.keyPrefix | quote }}
+            - name: REDIS_MAX_EVENTS
+              value: {{ .Values.redis.maxEvents | quote }}
+            - name: REQUIRE_REDIS
+              value: {{ .Values.redis.requireForReadiness | quote }}
+            {{- if .Values.redis.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "msp-demo.redisSecretName" . }}
+                  key: {{ .Values.redis.auth.passwordKey }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - sh
+                  - -ec
+                  - sleep {{ .Values.rollout.preStopSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

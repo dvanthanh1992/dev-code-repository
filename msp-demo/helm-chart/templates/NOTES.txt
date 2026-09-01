@@ -1,0 +1,18 @@
+Strategy: {{ include "msp-demo.strategy" . }}
+
+Application:
+  https://{{ .Values.ingress.host }}
+
+{{- if eq (include "msp-demo.strategy" .) "blueGreen" }}
+Preview:
+  https://{{ .Values.previewIngress.host }}
+{{- end }}
+
+Watch Rollout:
+  kubectl argo rollouts get rollout {{ include "msp-demo.fullname" . }} -n {{ .Release.Namespace }} --watch
+
+Watch Pods:
+  kubectl -n {{ .Release.Namespace }} get pods -l 'app.kubernetes.io/name={{ include "msp-demo.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=app' -L app.kubernetes.io/version,demo.argoproj.io/role,rollouts-pod-template-hash --watch
+
+Port-forward fallback:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "msp-demo.fullname" . }} 8080:{{ .Values.service.port }}

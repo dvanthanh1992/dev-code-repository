@@ -1,0 +1,42 @@
+services:
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-local-demo-password}
+    command:
+      - sh
+      - -ec
+      - exec redis-server --appendonly yes --appendfsync everysec --requirepass "$${REDIS_PASSWORD}"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      APP_VERSION: ${APP_VERSION:-v1}
+      APP_COLOR: ${APP_COLOR:-blue}
+      APP_COMMIT: ${APP_COMMIT:-local}
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-local}
+      TRAFFIC_RPS: ${TRAFFIC_RPS:-6}
+      FAILURE_RATE: ${FAILURE_RATE:-0}
+      MIN_LATENCY_MS: ${MIN_LATENCY_MS:-15}
+      MAX_LATENCY_MS: ${MAX_LATENCY_MS:-80}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-local-demo-password}
+      REDIS_KEY_PREFIX: msp-demo
+      REQUIRE_REDIS: "true"
+      KUBERNETES_DISCOVERY_ENABLED: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:

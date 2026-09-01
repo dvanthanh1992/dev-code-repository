@@ -1,0 +1,214 @@
+---
+
+replicaCount: 5
+
+image:
+  repository: dvanthanh1992/msp-demo
+  # blue | green | purple | orange
+  tag: latest
+  pullPolicy: Always
+
+app:
+  # v1 — BLUE
+  # version: v1
+  # color: blue
+  # commit: demo-v1
+
+  # v2 — GREEN
+  version: v2
+  color: green
+  commit: demo-v2
+
+  # v3 — PURPLE
+  # version: v3
+  # color: purple
+  # commit: demo-v3
+
+  # v4 — ORANGE
+  # version: v4
+  # color: orange
+  # commit: demo-v4
+
+  environment: sa-rke2-mgmt
+  failureRate: "0"
+  minLatencyMs: "25"
+  maxLatencyMs: "120"
+
+# canary | blueGreen
+strategy: canary
+
+canary:
+  maxSurge: 1
+  maxUnavailable: 0
+  steps:
+    - setWeight: 20
+    - pause:
+        duration: 30s
+    - setWeight: 40
+    - pause:
+        duration: 30s
+    - setWeight: 60
+    - pause:
+        duration: 30s
+    - setWeight: 80
+    - pause:
+        duration: 30s
+
+blueGreen:
+  autoPromotionEnabled: false
+  autoPromotionSeconds: 30
+  scaleDownDelaySeconds: 30
+  previewReplicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  host: msp-demo.mercurybridge.org
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: msp-demo.mercurybridge.org
+    external-dns.alpha.kubernetes.io/target: 172.16.159.14
+    external-dns.alpha.kubernetes.io/ttl: "60"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  tls:
+    enabled: true
+    secretName: tls-msp-demo-ingress
+
+# Used only with strategy=blueGreen.
+previewIngress:
+  enabled: true
+  host: msp-demo-preview.mercurybridge.org
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: msp-demo-preview.mercurybridge.org
+    external-dns.alpha.kubernetes.io/target: 172.16.159.14
+    external-dns.alpha.kubernetes.io/ttl: "60"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  tls:
+    enabled: true
+    secretName: tls-msp-demo-preview-ingress
+
+certificate:
+  enabled: true
+  issuerRef:
+    name: letsencrypt-dns
+    kind: ClusterIssuer
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# -----------------------------------------------------------------------------
+# Added for real Pod topology and Redis state-continuity demonstration.
+# The original values structure above remains unchanged.
+# -----------------------------------------------------------------------------
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+rollout:
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  progressDeadlineAbort: true
+  minReadySeconds: 5
+  terminationGracePeriodSeconds: 20
+  preStopSeconds: 5
+
+traffic:
+  rps: 6
+  previewRps: 1
+
+podDiscovery:
+  enabled: true
+  topologyCacheSeconds: "0.75"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+podAnnotations: {}
+podLabels: {}
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 2
+  readiness:
+    periodSeconds: 3
+    timeoutSeconds: 2
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  host: ""
+  port: 6379
+  db: 0
+  ssl: false
+  keyPrefix: msp-demo
+  maxEvents: 500
+  requireForReadiness: true
+  auth:
+    enabled: true
+    existingSecret: msp-demo-redis-auth
+    passwordKey: password
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+externalSecret:
+  enabled: true
+  apiVersion: external-secrets.io/v1
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  remoteRef:
+    key: prd-rke2-sa-mgmt/msp-demo
+    property: redis-password
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <script defer src="/static/js/app.js"></script>
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark">Tony</div>
+            <div class="brand-copy">
+                <div class="eyebrow">Kubernetes progressive delivery</div>
+                <h1>MSP Demo</h1>
+                <div class="brand-subtitle">Traffic Client → Service → Pod </div>
+            </div>
+            <div class="mode-badge" id="modeBadge">CANARY</div>
+        </div>
+
+        <div class="header-avatar" aria-hidden="true">
+            <img src="/static/img/tony-avatar.jpg" alt="">
+        </div>
+
+        <div class="global-metrics">
+            <div class="metric">
+                <div class="metric-label">Requests</div>
+                <div class="metric-value" id="requestCount">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Errors</div>
+                <div class="metric-value" id="errorCount">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Observed RPS</div>
+                <div class="metric-value" id="observedRps">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg latency</div>
+                <div class="metric-value" id="averageLatency">0ms</div>
+            </div>
+            <div class="metric redis-metric">
+                <div class="metric-label">Redis sequence</div>
+                <div class="metric-value" id="headerRedisSequence">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <label class="rps-control" title="Browser-generated traffic rate">
+                <span>LOAD</span>
+                <input id="rpsSlider" type="range" min="1" max="50" step="1" value="3">
+                <strong id="rpsSetting">3 RPS</strong>
+            </label>
+            <button class="button" id="resetButton" type="button">RESET UI</button>
+            <button class="button primary" id="toggleButton" type="button">PAUSE</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="panel topology-panel">
+            <div class="panel-heading">
+                <div class="panel-title">
+                    LIVE KUBERNETES TOPOLOGY
+                    <span id="environmentLabel">Environment: loading</span>
+                </div>
+                <div class="heading-actions">
+                    <div class="source-badge" id="topologySource">Kubernetes API</div>
+                    <div class="connection" id="connectionState">
+                        <span class="connection-dot"></span>
+                        <span id="connectionText">Waiting for responses</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="topology" id="topology">
+                <svg class="links" id="links" aria-hidden="true"></svg>
+                <div class="packet-layer" id="packetLayer"></div>
+
+                <div class="phase-banner">
+                    <span class="phase-dot"></span>
+                    <span id="phaseText">Loading rollout and pods</span>
+                </div>
+
+                <article class="node client-node" id="clientNode">
+                    <div class="node-icon">⇢</div>
+                    <div class="node-kicker">Traffic Generator</div>
+                    <div class="node-title">Demo Client</div>
+                    <div class="node-copy">Browser sends real requests. Each response returns the exact Pod hostname.</div>
+                    <div class="client-rate">
+                        <span>Configured load</span>
+                        <strong id="clientRate">6 req/s</strong>
+                    </div>
+                    <div class="client-rate secondary-row">
+                        <span>In flight</span>
+                        <strong id="inFlightCount">0</strong>
+                    </div>
+                </article>
+
+                <article class="node service-node" id="serviceNode">
+                    <div class="service-visual">
+                        <div class="service-icon">SVC</div>
+                        <div>
+                            <div class="node-kicker">Kubernetes Routing</div>
+                            <div class="service-name">Ingress / Service</div>
+                            <div class="service-subtitle">Only Ready Pods receive normal Service traffic</div>
+                        </div>
+                    </div>
+
+                    <div class="rollout-status-grid">
+                        <div class="mini-stat">
+                            <span>Desired</span>
+                            <strong id="desiredReplicas">–</strong>
+                        </div>
+                        <div class="mini-stat">
+                            <span>Ready</span>
+                            <strong id="readyReplicas">–</strong>
+                        </div>
+                        <div class="mini-stat">
+                            <span>Updated</span>
+                            <strong id="updatedReplicas">–</strong>
+                        </div>
+                        <div class="mini-stat">
+                            <span>Phase</span>
+                            <strong id="rolloutPhase">–</strong>
+                        </div>
+                    </div>
+
+                    <div class="service-tunnel" id="serviceTunnel" aria-label="Service traffic tunnel">
+                        <div class="tunnel-entry"></div>
+                        <div class="tunnel-track">
+                            <div class="tunnel-glow"></div>
+                            <div class="tunnel-label">NGINX Load Balancing </div>
+                        </div>
+                        <div class="tunnel-exit"></div>
+                    </div>
+
+                    <div class="split-box">
+                        <div class="split-header">
+                            <span>Observed traffic · last 100</span>
+                            <span class="split-value" id="splitSummary">No responses</span>
+                        </div>
+                        <div class="traffic-split" id="trafficSplit">
+                            <div class="empty-copy">Waiting for traffic</div>
+                        </div>
+                    </div>
+                </article>
+
+                <section class="pod-zone" id="podZone">
+                    <div class="pod-zone-heading">
+                        <div>
+                            <div class="node-kicker">Live Kubernetes Workloads</div>
+                            <div class="pod-zone-title">Tony Demo Application Pods</div>
+                        </div>
+                        <div class="pod-summary">
+                            <span><strong id="podCount">0</strong> total</span>
+                            <span><strong id="podReadyCount">0</strong> ready</span>
+                            <span><strong id="podTerminatingCount">0</strong> terminating</span>
+                        </div>
+                    </div>
+                    <div class="pod-grid" id="podGrid">
+                        <div class="pod-empty" id="podEmpty">Waiting for Kubernetes Pod discovery...</div>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section class="bottom-grid">
+            <article class="panel redis-panel">
+                <div class="panel-heading compact-heading">
+                    <div class="panel-title">Redis persistent state <span>outside application Pods</span></div>
+                    <div class="connection" id="redisConnection">
+                        <span class="connection-dot"></span>
+                        <span id="redisConnectionText">Connecting</span>
+                    </div>
+                </div>
+                <div class="redis-content">
+                    <div class="redis-stat-grid">
+                        <div class="redis-stat">
+                            <span>Persistent sequence</span>
+                            <strong id="redisSequence">0</strong>
+                        </div>
+                        <div class="redis-stat">
+                            <span>Stored events</span>
+                            <strong id="redisStoredEvents">0</strong>
+                        </div>
+                        <div class="redis-stat">
+                            <span>Writer Pods</span>
+                            <strong id="redisWriterPods">0</strong>
+                        </div>
+                        <div class="redis-stat">
+                            <span>Pod lifecycle</span>
+                            <strong id="podTransitions">0</strong>
+                        </div>
+                    </div>
+
+                    <div class="continuity-banner" id="continuityBanner">
+                        <span class="continuity-icon">✓</span>
+                        <div>
+                            <strong id="continuityTitle">Waiting for Redis state</strong>
+                            <span id="continuityText">Sequence is checked independently from browser request order.</span>
+                        </div>
+                    </div>
+
+                    <div class="demo-value-box">
+                        <div>
+                            <div class="demo-value-label">Persistent demo value</div>
+                            <div class="demo-value-meta" id="demoValueMeta">Save once, then roll the application.</div>
+                        </div>
+                        <div class="demo-value-form">
+                            <input id="demoValueInput" type="text" maxlength="200" placeholder="e.g. order-2026-0001">
+                            <button class="button redis-button" id="saveDemoValueButton" type="button">SAVE TO REDIS</button>
+                        </div>
+                    </div>
+
+                    <div class="last-writer">
+                        <span>Last Redis writer</span>
+                        <code id="lastRedisWriter">–</code>
+                    </div>
+                </div>
+            </article>
+
+            <article class="panel timeline-panel">
+                <div class="panel-heading compact-heading">
+                    <div class="panel-title">Response timeline <span>newest on the right</span></div>
+                    <div class="muted" id="successRate">Success 100%</div>
+                </div>
+                <div class="timeline-content">
+                    <div class="timeline-legend" id="timelineLegend"></div>
+                    <div class="timeline" id="timeline"></div>
+                </div>
+            </article>
+
+            <article class="panel log-panel">
+                <div class="panel-heading compact-heading">
+                    <div class="panel-title">Latest requests <span>actual responder</span></div>
+                    <div class="muted" id="latestRequestStatus">No traffic</div>
+                </div>
+                <div class="log-wrap">
+                    <table class="request-log">
+                        <colgroup>
+                            <col style="width: 17%">
+                            <col style="width: 15%">
+                            <col style="width: 20%">
+                            <col style="width: 31%">
+                            <col style="width: 17%">
+                        </colgroup>
+                        <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Version</th>
+                            <th>Role</th>
+                            <th>Pod</th>
+                            <th>Status</th>
+                        </tr>
+                        </thead>
+                        <tbody id="requestLog"></tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+    </main>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+</body>
+</html>

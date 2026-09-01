@@ -1,0 +1,10 @@
+---
+apiVersion: v2
+name: msp-demo
+description: ArgoCD MSP traffic visualization demo 
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Tony
+    url: https://github.com/duongvanthanh1992

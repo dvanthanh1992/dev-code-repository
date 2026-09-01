@@ -1,0 +1,40 @@
+{{- if .Values.podDiscovery.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "msp-demo.fullname" . }}-topology-reader
+  labels:
+    {{- include "msp-demo.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - rollouts
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "msp-demo.fullname" . }}-topology-reader
+  labels:
+    {{- include "msp-demo.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "msp-demo.fullname" . }}-topology-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "msp-demo.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

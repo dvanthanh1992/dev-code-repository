@@ -1,0 +1,33 @@
+{{- $strategy := include "msp-demo.strategy" . -}}
+{{- if and .Values.certificate.enabled .Values.ingress.enabled .Values.ingress.tls.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "msp-demo.fullname" . }}
+  labels:
+    {{- include "msp-demo.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.ingress.tls.secretName }}
+  issuerRef:
+    name: {{ .Values.certificate.issuerRef.name }}
+    kind: {{ .Values.certificate.issuerRef.kind }}
+  dnsNames:
+    - {{ .Values.ingress.host | quote }}
+{{- end }}
+{{- if and .Values.certificate.enabled (eq $strategy "blueGreen") .Values.previewIngress.enabled .Values.previewIngress.tls.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "msp-demo.previewServiceName" . }}
+  labels:
+    {{- include "msp-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: preview
+spec:
+  secretName: {{ .Values.previewIngress.tls.secretName }}
+  issuerRef:
+    name: {{ .Values.certificate.issuerRef.name }}
+    kind: {{ .Values.certificate.issuerRef.kind }}
+  dnsNames:
+    - {{ .Values.previewIngress.host | quote }}
+{{- end }}
